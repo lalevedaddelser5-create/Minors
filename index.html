@@ -1,315 +1,392 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Flujograma: acuerdos de los minors - Universidad EIA</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
-    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <script src="https://unpkg.com/lucide@latest"></script>
-    <style>
-        body { background-color: #f1f5f9; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; overflow-x: hidden; }
-        .custom-scrollbar::-webkit-scrollbar { height: 10px; width: 10px; }
-        .custom-scrollbar::-webkit-scrollbar-track { background: #e2e8f0; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #94a3b8; border-radius: 10px; border: 2px solid #e2e8f0; }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #64748b; }
-        @keyframes pulse-subtle {
-            0%, 100% { transform: scale(1); opacity: 1; }
-            50% { transform: scale(1.05); opacity: 0.8; }
-        }
-        .instruction-pulse { animation: pulse-subtle 2s infinite ease-in-out; }
-    </style>
-</head>
-<body>
-    <div id="root"></div>
+import React, { useState } from 'react';
+import { ArrowDown, CheckCircle, Info, Users, BookOpen, Award, FileText, RefreshCcw, AlertTriangle, ChevronDown, ChevronUp, MousePointer2 } from 'lucide-react';
 
-    <script type="text/babel">
-        const { useState, useEffect } = React;
+// --- COMPONENTES BASE ---
 
-        const Icon = ({ name, size = 18, className = "" }) => {
-            useEffect(() => {
-                if (window.lucide) window.lucide.createIcons();
-            }, [name]);
-            return <i data-lucide={name} style={{ width: size, height: size }} className={className}></i>;
-        };
+const VNode = ({ title, type = 'process', icon: Icon, onClick, isInteractive = false }) => {
+  const baseStyle = "flex flex-col items-center justify-center text-center p-4 rounded-xl border-2 shadow-sm transition-all duration-300 w-full max-w-[16rem] min-h-[5rem] z-10 relative mx-auto";
+  
+  const typeStyles = {
+    start: "bg-emerald-50 border-emerald-500 text-emerald-900 font-semibold rounded-full max-w-[12rem] min-h-[3rem] py-2",
+    process: "bg-white border-slate-200 text-slate-700",
+    interactive: "bg-blue-50 border-blue-400 text-blue-900 cursor-pointer hover:bg-blue-100 hover:shadow-md hover:-translate-y-1",
+    end: "bg-slate-100 border-slate-400 text-slate-800 font-semibold rounded-full max-w-[12rem] min-h-[3rem] py-2"
+  };
 
-        const App = () => {
-            const [activeTab, setActiveTab] = useState(0);
-            const [selectedStep, setSelectedStep] = useState(null);
+  const appliedStyle = isInteractive ? typeStyles.interactive : typeStyles[type];
 
-            const tabs = [
-                { id: 0, title: "1. Creación y aprobación", icon: "settings" },
-                { id: 1, title: "2. Matrícula y cursado", icon: "graduation-cap" },
-                { id: 2, title: "3. Certificación y casos", icon: "award" }
-            ];
+  return (
+    <div className={`${baseStyle} ${appliedStyle}`} onClick={isInteractive ? onClick : undefined}>
+      {Icon && <Icon className={`mb-2 ${isInteractive ? 'text-blue-600' : 'opacity-70'}`} size={20} />}
+      <span className="text-sm leading-tight">{title}</span>
+      {isInteractive && (
+        <div className="absolute -bottom-3 bg-blue-600 text-white rounded-full p-1 shadow-md animate-bounce">
+          <MousePointer2 size={12} />
+        </div>
+      )}
+    </div>
+  );
+};
 
-            const ProcessStep = ({ title, responsibles, description, type = "step" }) => {
-                const styles = {
-                    step: "border-blue-200 bg-white text-slate-800 shadow-sm hover:border-blue-400",
-                    decision: "border-amber-400 bg-amber-50 text-amber-900 font-bold shadow-sm hover:bg-amber-100",
-                    error: "border-rose-300 bg-rose-50 text-rose-800 hover:bg-rose-100",
-                    success: "border-green-600 bg-green-600 text-white font-bold shadow-md hover:bg-green-700"
-                };
+const VArrow = ({ label }) => (
+  <div className="flex flex-col items-center justify-center -my-1 z-0 relative w-full h-10">
+    <div className="absolute top-0 bottom-0 w-0.5 bg-slate-300"></div>
+    <ArrowDown className="absolute bottom-0 text-slate-400 bg-slate-50" size={18} />
+    {label && (
+      <span className="absolute bg-white text-blue-700 text-[10px] font-bold px-2 py-0.5 rounded border border-slate-200 shadow-sm left-1/2 ml-2">
+        {label}
+      </span>
+    )}
+  </div>
+);
 
-                return (
-                    <div 
-                        className={`relative p-4 rounded-xl border-2 transition-all cursor-pointer min-w-[220px] max-w-[260px] flex flex-col gap-2 shrink-0 ${styles[type]}`}
-                        onClick={() => setSelectedStep({ title, responsibles, description })}
+// Decisión interactiva: oculta el camino "No" hasta que se hace clic
+const VDecisionInteractive = ({ title, noLabel, noTarget, noNote }) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  return (
+    <div className="relative flex flex-col items-center w-full max-w-sm mx-auto">
+      <div className="bg-amber-50 border-2 border-amber-300 text-amber-900 font-medium p-4 rounded-xl shadow-sm w-full max-w-[16rem] text-center z-10">
+        <span className="block text-sm mb-3">{title}</span>
+        <button 
+          onClick={() => setIsExpanded(!isExpanded)}
+          className={`flex items-center justify-center w-full text-xs font-bold py-1.5 px-3 rounded-lg transition-colors ${
+            isExpanded ? 'bg-orange-200 text-orange-800' : 'bg-white border border-amber-300 text-amber-700 hover:bg-amber-100'
+          }`}
+        >
+          {isExpanded ? 'Ocultar alternativa' : '¿Qué pasa si es NO?'}
+          {isExpanded ? <ChevronUp size={14} className="ml-1" /> : <ChevronDown size={14} className="ml-1" />}
+        </button>
+      </div>
+      
+      {/* Panel desplegable de la alternativa "No" */}
+      <div className={`overflow-hidden transition-all duration-300 ease-in-out flex flex-col items-center w-full ${isExpanded ? 'max-h-48 opacity-100 mt-2' : 'max-h-0 opacity-0'}`}>
+        <div className="w-0.5 h-4 bg-orange-300 border-dashed border-l-2"></div>
+        <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 w-full max-w-[15rem] text-center shadow-inner relative">
+          <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 bg-orange-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm">NO</span>
+          <span className="block text-sm font-medium text-orange-900 leading-tight mt-2">{noLabel}</span>
+          {noTarget && (
+            <span className="flex items-center justify-center text-[10px] text-orange-700 font-semibold uppercase mt-2 bg-orange-100 py-1 rounded">
+              <RefreshCcw size={10} className="mr-1 shrink-0" /> Vuelve a: {noTarget}
+            </span>
+          )}
+          {noNote && <span className="block text-[11px] text-orange-700 mt-1 leading-tight">{noNote}</span>}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const AccordionItem = ({ title, children }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  return (
+    <div className="border border-slate-200 rounded-lg mb-2 bg-white overflow-hidden shadow-sm">
+      <button 
+        className="w-full flex justify-between items-center p-4 text-left hover:bg-slate-50 transition-colors"
+        onClick={() => setIsOpen(!isOpen)}
+      >
+        <span className="font-semibold text-sm text-slate-800">{title}</span>
+        {isOpen ? <ChevronUp size={18} className="text-slate-400" /> : <ChevronDown size={18} className="text-slate-400" />}
+      </button>
+      {isOpen && (
+        <div className="p-4 pt-0 text-sm text-slate-600 border-t border-slate-100 bg-slate-50 leading-relaxed">
+          {children}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// --- COMPONENTE PRINCIPAL ---
+
+export default function App() {
+  const [activeTab, setActiveTab] = useState(0);
+  const [modalData, setModalData] = useState(null);
+  
+  // Estado para bifurcación interactiva en Fase 2
+  const [selectedPath, setSelectedPath] = useState(null); // 'opcion1' | 'opcion2'
+
+  const tabs = [
+    "Creación y aprobación",
+    "Matrícula del estudiante",
+    "Certificación y casos"
+  ];
+
+  const openCriteriosModal = () => {
+    setModalData({
+      title: "Criterios curriculares a verificar",
+      items: [
+        "Propósito formativo definido (competencia).",
+        "Carga académica mínima: 9 créditos.",
+        "Articulación formativa gradual y coherente.",
+        "Prerrequisitos, correquisitos y equivalencias analizadas.",
+        "Origen de las asignaturas (exclusivo pregrado EIA).",
+        "Microcurrículos diseñados y actualizados."
+      ]
+    });
+  };
+
+  return (
+    <div className="min-h-screen bg-slate-100 text-slate-800 font-sans p-4 md:p-6">
+      
+      <header className="max-w-3xl mx-auto mb-6">
+        <h1 className="text-2xl md:text-3xl font-bold text-slate-900 mb-2 tracking-tight">Flujograma: acuerdos de los minors académicos</h1>
+        <p className="text-sm text-slate-600">Universidad EIA - Diagrama de proceso interactivo.</p>
+      </header>
+
+      <div className="max-w-3xl mx-auto">
+        {/* Navegación */}
+        <div className="flex flex-wrap gap-2 mb-6 bg-white p-2 rounded-xl shadow-sm border border-slate-200">
+          {tabs.map((tab, index) => (
+            <button
+              key={index}
+              onClick={() => { setActiveTab(index); setSelectedPath(null); }}
+              className={`flex-1 min-w-[140px] px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
+                activeTab === index 
+                  ? 'bg-blue-600 text-white shadow-md' 
+                  : 'bg-transparent text-slate-600 hover:bg-slate-50'
+              }`}
+            >
+              {tab}
+            </button>
+          ))}
+        </div>
+
+        <div className="bg-slate-50 rounded-2xl shadow-md border border-slate-200 overflow-hidden flex flex-col">
+          
+          {/* --- FASE 1: CREACIÓN --- */}
+          {activeTab === 0 && (
+            <div className="animate-in fade-in zoom-in-95 duration-300">
+              <div className="bg-white p-4 border-b border-slate-200 flex flex-col sm:flex-row gap-4 text-xs md:text-sm">
+                <div className="flex items-start text-slate-700 flex-1">
+                  <Users size={16} className="mr-2 text-blue-600 shrink-0 mt-0.5" />
+                  <span><strong>Responsables:</strong> Proponente, Dirección de Programa, Comité Central de Currículo, EduLAB.</span>
+                </div>
+                <div className="flex items-start text-slate-700 flex-1">
+                  <Info size={16} className="mr-2 text-blue-600 shrink-0 mt-0.5" />
+                  <span><strong>Nota:</strong> Solo asignaturas de pregrado. No aplica posgrados ni educación continua.</span>
+                </div>
+              </div>
+
+              <div className="flex flex-col items-center py-10 px-4 w-full">
+                <VNode title="Inicio" type="start" />
+                <VArrow />
+                <VNode title="Proponer idea de minor" />
+                <VArrow />
+                <VNode 
+                  title="Diligenciar formulario y presentar propuesta" 
+                  isInteractive={true} 
+                  icon={FileText}
+                  onClick={openCriteriosModal} 
+                />
+                <VArrow />
+                <VDecisionInteractive 
+                  title="¿Cumple criterios curriculares?" 
+                  noLabel="Ajustar propuesta" 
+                  noTarget="Diligenciar formulario" 
+                />
+                <VArrow label="Sí" />
+                <VNode title="Revisión de la propuesta por la Dirección" />
+                <VArrow />
+                <VDecisionInteractive 
+                  title="¿Director da visto bueno?" 
+                  noLabel="Informar no aprobación y solicitar ajustes" 
+                  noTarget="Diligenciar formulario" 
+                />
+                <VArrow label="Sí" />
+                <VNode title="Evaluación de viabilidad (Comité Central)" />
+                <VArrow />
+                <VDecisionInteractive 
+                  title="¿Comité aprueba creación del minor?" 
+                  noLabel="Informar respuesta al solicitante" 
+                  noNote="(Se solicitan ajustes o no se aprueba)" 
+                />
+                <VArrow label="Sí" />
+                <VNode title="Gestión de creación en sistema académico" />
+                <VArrow />
+                <VNode title="Incorporación a la oferta institucional" />
+                <VArrow />
+                <VNode title="Fin" type="end" />
+              </div>
+            </div>
+          )}
+
+          {/* --- FASE 2: MATRÍCULA --- */}
+          {activeTab === 1 && (
+            <div className="animate-in fade-in zoom-in-95 duration-300">
+              <div className="bg-white p-4 border-b border-slate-200 text-sm">
+                <div className="flex items-center text-slate-700">
+                  <Users size={16} className="mr-2 text-blue-600 shrink-0" />
+                  <span><strong>Responsables:</strong> Estudiante, Dirección de Programa, Sistema Académico.</span>
+                </div>
+              </div>
+
+              <div className="flex flex-col items-center py-10 px-4 w-full">
+                <VNode title="Inicio" type="start" />
+                <VArrow />
+                <VNode title="Estudiante con matrícula vigente en pregrado" />
+                <VArrow />
+                <VNode title="Elegir un minor de la oferta institucional" />
+                <VArrow />
+                <VDecisionInteractive title="¿El minor aplica para su programa?" noLabel="No puede obtener reconocimiento del minor" />
+                <VArrow label="Sí" />
+                <VNode title="Realizar solicitud formal ante la Dirección" />
+                <VArrow />
+                <VDecisionInteractive title="¿Cumple prerrequisitos (de asignatura o minor)?" noLabel="Debe cumplir los prerrequisitos antes de matricular" />
+                <VArrow label="Sí" />
+                <VDecisionInteractive title="¿Hay oferta, cupos y compatibilidad horaria?" noLabel="Esperar nueva oferta o disponibilidad de cupos" />
+                <VArrow label="Sí" />
+
+                {/* BIFURCACIÓN INTERACTIVA */}
+                <div className="w-full max-w-lg mt-6 bg-white p-6 rounded-xl border border-blue-200 shadow-sm relative">
+                  <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-blue-100 text-blue-800 text-[10px] font-bold px-3 py-1 uppercase tracking-wider rounded-full border border-blue-200">
+                    Paso interactivo
+                  </span>
+                  <h3 className="text-center font-semibold text-slate-800 mb-4 text-sm">Selecciona la forma de matrícula del estudiante:</h3>
+                  
+                  <div className="flex flex-col sm:flex-row gap-3 justify-center mb-6">
+                    <button 
+                      onClick={() => setSelectedPath('opcion1')}
+                      className={`px-4 py-3 rounded-lg text-sm font-medium border-2 transition-all flex-1 ${
+                        selectedPath === 'opcion1' ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-slate-200 text-slate-600 hover:border-blue-300 hover:bg-slate-50'
+                      }`}
                     >
-                        {responsibles && (
-                            <div className="flex gap-1 flex-wrap">
-                                {responsibles.map((r, i) => (
-                                    <span key={i} className="text-[9px] px-2 py-0.5 bg-slate-100/90 text-slate-700 rounded-md font-bold uppercase border border-slate-200">
-                                        {r}
-                                    </span>
-                                ))}
-                            </div>
-                        )}
-                        <h4 className="text-sm leading-snug font-semibold">{title}</h4>
-                        {type === "decision" && (
-                            <div className="absolute -right-3 top-1/2 -translate-y-1/2 bg-white rounded-full p-1 border-2 border-amber-400 shadow-sm">
-                                <Icon name="help-circle" size={14} className="text-amber-500" />
-                            </div>
-                        )}
-                    </div>
-                );
-            };
+                      Opción 1: Optativa / Electiva
+                    </button>
+                    <button 
+                      onClick={() => setSelectedPath('opcion2')}
+                      className={`px-4 py-3 rounded-lg text-sm font-medium border-2 transition-all flex-1 ${
+                        selectedPath === 'opcion2' ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-slate-200 text-slate-600 hover:border-blue-300 hover:bg-slate-50'
+                      }`}
+                    >
+                      Opción 2: Créditos adicionales
+                    </button>
+                  </div>
 
-            const Connector = ({ label, color = "slate", vertical = false }) => (
-                <div className={`flex items-center justify-center shrink-0 ${vertical ? 'flex-col min-h-[40px]' : 'min-w-[40px]'}`}>
-                    <div className={`${vertical ? 'w-1 h-full' : 'h-1 w-full'} bg-${color}-200 relative rounded-full`}>
-                        <div className={`absolute ${vertical ? 'bottom-0 -left-1.5 border-l-6 border-r-6 border-t-6 border-transparent border-t-slate-300' : 'right-0 -top-1.5 border-t-6 border-b-6 border-l-6 border-transparent border-l-slate-300'}`} />
-                    </div>
-                    {label && <span className={`text-[10px] font-black text-${color}-600 ${vertical ? 'ml-6' : 'mt-1'} uppercase tracking-wider`}>{label}</span>}
+                  {/* Renderizado condicional de la ruta seleccionada */}
+                  <div className="min-h-[160px] flex flex-col items-center justify-center bg-slate-50 rounded-lg p-4 border border-dashed border-slate-300">
+                    {!selectedPath && (
+                      <div className="text-slate-400 text-sm flex flex-col items-center">
+                        <MousePointer2 size={24} className="mb-2 opacity-50" />
+                        Haz clic en una opción para ver la ruta
+                      </div>
+                    )}
+
+                    {selectedPath === 'opcion1' && (
+                      <div className="animate-in fade-in slide-in-from-top-4 w-full flex flex-col items-center">
+                        <VNode title="Matricular como optativa o electiva dentro del plan" />
+                        <VArrow />
+                        <VNode title="Cursar asignaturas del minor" icon={BookOpen} type="end" />
+                      </div>
+                    )}
+
+                    {selectedPath === 'opcion2' && (
+                      <div className="animate-in fade-in slide-in-from-top-4 w-full flex flex-col items-center">
+                        <VNode title="Matricular como créditos adicionales" />
+                        <VArrow />
+                        <VDecisionInteractive 
+                          title="¿No excede carga máxima permitida?" 
+                          noLabel="No puede matricular" 
+                          noNote="(Excede el límite de créditos del periodo)" 
+                        />
+                        <VArrow label="Sí" />
+                        <VNode title="Cursar asignaturas del minor" icon={BookOpen} type="end" />
+                      </div>
+                    )}
+                  </div>
                 </div>
-            );
 
-            return (
-                <div className="min-h-screen p-4 flex flex-col gap-4">
-                    <header className="w-full max-w-[98%] mx-auto">
-                        <h1 className="text-3xl font-bold text-slate-800 tracking-tight">Flujograma: acuerdos de los minors académicos</h1>
-                        <p className="text-blue-600 text-lg font-semibold mt-0.5">Universidad EIA • Pedagogía y Currículo</p>
-                    </header>
+              </div>
+            </div>
+          )}
 
-                    <div className="flex-1 w-full max-w-[98%] mx-auto bg-white rounded-2xl shadow-xl overflow-hidden flex flex-col md:flex-row border border-slate-200">
-                        {/* Sidebar */}
-                        <div className="w-full md:w-64 bg-slate-900 p-5 flex flex-col gap-3 shrink-0">
-                            {tabs.map((tab) => (
-                                <button
-                                    key={tab.id}
-                                    onClick={() => { setActiveTab(tab.id); setSelectedStep(null); }}
-                                    className={`flex items-center gap-3 px-4 py-4 rounded-xl transition-all text-sm font-bold border-2 ${
-                                        activeTab === tab.id 
-                                        ? 'bg-blue-600 text-white border-blue-400 shadow-lg' 
-                                        : 'text-slate-400 border-transparent hover:bg-slate-800 hover:text-white'
-                                    }`}
-                                >
-                                    <Icon name={tab.icon} size={20} />
-                                    {tab.title}
-                                </button>
-                            ))}
-                            
-                            <div className="mt-auto pt-8">
-                                <div className="p-4 bg-slate-800/50 rounded-xl border border-slate-700 text-[11px] text-slate-300 leading-relaxed">
-                                    <h5 className="font-black text-blue-400 uppercase mb-2 tracking-widest flex items-center gap-2">
-                                        <Icon name="bookmark" size={12} /> Notas clave
-                                    </h5>
-                                    <ul className="space-y-2 font-medium text-slate-400">
-                                        <li>• Solo con asignaturas de pregrado de la Universidad EIA.</li>
-                                        <li>• No se incluyen posgrado ni educación continua.</li>
-                                    </ul>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Contenido Principal */}
-                        <div className="flex-1 p-6 overflow-x-auto custom-scrollbar bg-slate-50/50 flex flex-col">
-                            {/* Instrucción de Interacción */}
-                            <div className="flex items-center justify-center gap-2 mb-6 bg-white py-2 px-6 rounded-xl w-fit mx-auto border border-blue-100 shadow-sm">
-                                <Icon name="mouse-pointer-2" size={18} className="text-blue-600 instruction-pulse" />
-                                <span className="text-sm font-bold text-slate-700 italic">Haz clic en cada paso para ver el detalle informativo.</span>
-                            </div>
-
-                            <div className="flex-1 min-w-max">
-                                {/* FASE 1: CREACIÓN */}
-                                {activeTab === 0 && (
-                                    <div className="flex flex-col gap-8 py-4">
-                                        <div className="flex items-center gap-4">
-                                            <div className="px-4 py-1.5 bg-green-600 text-white font-black rounded-lg text-[10px] shadow-md shrink-0">INICIO</div>
-                                            <ProcessStep title="Proponer idea de minor" responsibles={["Proponente"]} description="El estudiante, profesor o empleado propone una idea inicial fundamentada para un nuevo minor." />
-                                            <Connector />
-                                            <ProcessStep title="Diligenciar formulario institucional" responsibles={["Proponente"]} description="Presentación formal de la propuesta técnica del minor ante las instancias correspondientes." />
-                                            <Connector />
-                                            <div className="p-4 rounded-xl bg-amber-50 border border-amber-300 w-72 shadow-sm shrink-0">
-                                                <h4 className="text-[10px] font-black text-amber-800 uppercase mb-2 border-b border-amber-200 pb-1">Verificación de criterios</h4>
-                                                <ul className="text-[11px] space-y-1 text-amber-900 font-semibold">
-                                                    <li>• Propósito formativo definido</li>
-                                                    <li>• Carga académica mínima: 9 créditos</li>
-                                                    <li>• Articulación gradual y coherente</li>
-                                                    <li>• Prerrequisitos y equivalencias</li>
-                                                </ul>
-                                            </div>
-                                            <Connector />
-                                            <ProcessStep title="¿Cumple criterios curriculares?" type="decision" description="Evaluación técnica realizada por la Dirección de Pedagogía y Currículo." />
-                                            <Connector label="Sí" color="green" />
-                                            <ProcessStep title="Revisión Dirección de Programa" responsibles={["Dir. Programa"]} description="Evaluación de la pertinencia del minor dentro del programa académico específico." />
-                                        </div>
-
-                                        <div className="flex items-center gap-4 ml-20">
-                                            <Icon name="corner-right-down" className="text-slate-300" size={32} />
-                                            <Connector label="Sí" color="green" />
-                                            <ProcessStep title="Viabilidad por Comité Central" responsibles={["Comité Currículo"]} description="Evaluación final para asegurar la calidad institucional y la viabilidad del minor." />
-                                            <Connector label="Aprobado" color="green" />
-                                            <ProcessStep title="Gestión de creación en sistema" responsibles={["EduLAB"]} description="Proceso técnico de parametrización de las asignaturas en la plataforma académica." />
-                                            <Connector />
-                                            <ProcessStep title="Oferta institucional vigente" type="success" description="El minor ya se encuentra disponible para la elección y matrícula de los estudiantes." />
-                                            <div className="px-4 py-1.5 bg-slate-800 text-white font-black rounded-lg text-[10px] ml-4 shadow-lg tracking-widest">FIN</div>
-                                            
-                                            <div className="ml-12 flex items-center gap-3 bg-rose-50/50 p-3 rounded-xl border border-rose-100">
-                                                <Icon name="alert-triangle" size={18} className="text-rose-400" />
-                                                <div>
-                                                    <h5 className="text-[10px] font-black text-rose-500 uppercase tracking-wider mb-1">En caso de no aprobación:</h5>
-                                                    <ProcessStep title="Ajustar propuesta / Informar respuesta" type="error" description="Se solicitan los ajustes necesarios o se informa formalmente la decisión al proponente." />
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
-
-                                {/* FASE 2: MATRÍCULA */}
-                                {activeTab === 1 && (
-                                    <div className="flex flex-col gap-8 py-4">
-                                        <div className="flex items-center gap-4">
-                                            <div className="px-4 py-1.5 bg-green-600 text-white font-black rounded-lg text-[10px] shadow-md">INICIO</div>
-                                            <ProcessStep title="Estudiante con matrícula vigente" responsibles={["Estudiante"]} />
-                                            <Connector />
-                                            <ProcessStep title="Elegir minor de la oferta" responsibles={["Estudiante"]} />
-                                            <Connector />
-                                            <ProcessStep title="¿El minor aplica para su programa?" type="decision" />
-                                            <Connector label="Sí" color="green" />
-                                            <ProcessStep title="Realizar solicitud formal" responsibles={["Dir. Programa"]} />
-                                            <Connector />
-                                            <ProcessStep title="¿Cumple prerrequisitos 1ra asignatura?" type="decision" />
-                                            <Connector label="Sí" color="green" />
-                                            <ProcessStep title="¿Hay oferta, cupos y compatibilidad?" type="decision" responsibles={["Sistema"]} />
-                                        </div>
-
-                                        <div className="flex items-center gap-4 ml-12">
-                                            <Icon name="corner-right-down" className="text-slate-300" size={32} />
-                                            <div className="flex flex-row items-center border border-dashed border-blue-200 p-3 rounded-xl bg-white gap-4 shadow-sm">
-                                                <span className="text-[10px] font-black text-blue-500 uppercase tracking-widest">Matrícula:</span>
-                                                <ProcessStep title="Como optativa / electiva del plan" />
-                                                <ProcessStep title="Como créditos adicionales" />
-                                            </div>
-                                            <Connector />
-                                            <ProcessStep title="¿No excede carga máxima?" type="decision" />
-                                            <Connector label="Sí" color="green" />
-                                            <div className="p-4 bg-blue-700 text-white rounded-xl font-black text-lg shadow-xl uppercase tracking-widest">
-                                                CURSAR ASIGNATURAS
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
-
-                                {/* FASE 3: CERTIFICACIÓN */}
-                                {activeTab === 2 && (
-                                    <div className="flex flex-col gap-8 py-4">
-                                        <div className="flex items-center gap-6">
-                                            <ProcessStep title="¿Aprueba todas las asignaturas del minor?" type="decision" responsibles={["Sistema", "Estudiante"]} />
-                                            <div className="flex flex-col gap-4">
-                                                <div className="flex items-center gap-4">
-                                                    <Connector label="Sí" color="green" />
-                                                    <div className="flex items-center gap-5 p-5 bg-green-50 border-2 border-green-500 rounded-2xl shadow-lg">
-                                                        <Icon name="award" size={32} className="text-green-600" />
-                                                        <div>
-                                                            <h4 className="text-lg font-black text-green-900 leading-tight">Certificado Académico Complementario</h4>
-                                                            <p className="text-sm font-bold text-green-700 italic">Insignia digital institucional</p>
-                                                        </div>
-                                                        <div className="px-4 py-1.5 bg-slate-800 text-white font-black rounded-lg text-[10px] ml-4">FIN</div>
-                                                    </div>
-                                                </div>
-                                                <div className="flex items-center gap-4">
-                                                    <Connector label="No" color="rose" />
-                                                    <ProcessStep title="No se certifica el minor" type="error" />
-                                                    <Connector />
-                                                    <ProcessStep title="Se reconocen créditos aprobados" />
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        <div className="mt-4">
-                                            <h4 className="text-sm font-black text-slate-800 uppercase tracking-widest mb-4 border-b-2 border-blue-500 w-fit pb-0.5 flex items-center gap-2">
-                                                <Icon name="info" size={16} className="text-blue-500" />
-                                                Casos especiales
-                                            </h4>
-                                            <div className="grid grid-cols-5 gap-3">
-                                                {[
-                                                    { id: 'eg', t: "Egresados", i: "graduation-cap", c: "blue", d: "Finalización hasta 2 años después de graduarse como estudiante transitorio." },
-                                                    { id: 're', t: "Reprobación", i: "refresh-cw", c: "rose", d: "Optativa: Repetir o renunciar. Adicional: Repetir hasta aprobar." },
-                                                    { id: 'as', t: "Asociación", i: "share-2", c: "purple", d: "Las asignaturas compartidas se reconocen para ambos minors automáticamente." },
-                                                    { id: 'sp', t: "2do Programa", i: "school", c: "indigo", d: "Permite homologación si el minor aplica al nuevo plan de estudios." },
-                                                    { id: 'ob', t: "Obligatorias", i: "file-text", c: "slate", d: "Sin reconocimiento si más de una materia ya es obligatoria en el pregrado." }
-                                                ].map(item => (
-                                                    <div key={item.id} className="p-4 bg-white border border-slate-200 rounded-xl shadow-sm hover:border-blue-400 transition-all cursor-help shrink-0" onClick={() => setSelectedStep({title: item.t, description: item.d})}>
-                                                        <div className={`flex items-center gap-2 mb-2 text-${item.c}-600`}>
-                                                            <Icon name={item.i} size={18} />
-                                                            <h5 className="font-black text-[10px] uppercase">{item.t}</h5>
-                                                        </div>
-                                                        <p className="text-[11px] text-slate-600 leading-snug font-medium line-clamp-3">{item.d}</p>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* Panel de Detalles */}
-                            {selectedStep && (
-                                <div className="mt-8 p-6 bg-blue-50 border-l-4 border-blue-600 rounded-r-2xl shadow-lg animate-in fade-in slide-in-from-bottom-4 shrink-0">
-                                    <div className="flex justify-between items-start mb-2">
-                                        <h3 className="text-xl font-black text-blue-900 tracking-tight leading-none">{selectedStep.title}</h3>
-                                        <button onClick={() => setSelectedStep(null)} className="text-blue-400 hover:text-blue-900 transition-colors bg-white p-1 rounded-full shadow-sm">
-                                            <Icon name="x-circle" size={24} />
-                                        </button>
-                                    </div>
-                                    <p className="text-base text-blue-800 leading-relaxed font-semibold">
-                                        {selectedStep.description}
-                                    </p>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-
-                    {/* Footer - Tarjetas Reducidas */}
-                    <footer className="w-full max-w-[98%] mx-auto flex flex-col md:flex-row gap-4 mb-2">
-                        <div className="flex-1 flex items-center gap-4 p-4 bg-white border border-slate-200 rounded-xl shadow-md">
-                            <div className="bg-blue-100 p-2 rounded-lg text-blue-600">
-                                <Icon name="info" size={24} />
-                            </div>
-                            <div>
-                                <h6 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Impacto en el promedio</h6>
-                                <p className="text-sm md:text-base text-slate-800 font-bold leading-tight tracking-tight">Las asignaturas del minor inciden en el promedio crédito de la carrera.</p>
-                            </div>
-                        </div>
-                        <div className="flex-1 flex items-center gap-4 p-4 bg-white border border-slate-200 rounded-xl shadow-md">
-                            <div className="bg-green-100 p-2 rounded-lg text-green-600">
-                                <Icon name="check-square" size={24} />
-                            </div>
-                            <div>
-                                <h6 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Requisito de aprobación</h6>
-                                <p className="text-sm md:text-base text-slate-800 font-bold leading-tight tracking-tight">Mínimo de 9 créditos académicos por cada minor aprobado institucionalmente.</p>
-                            </div>
-                        </div>
-                    </footer>
+          {/* --- FASE 3: CERTIFICACIÓN --- */}
+          {activeTab === 2 && (
+            <div className="animate-in fade-in zoom-in-95 duration-300">
+              <div className="bg-white p-4 border-b border-slate-200 text-sm">
+                <div className="flex items-center text-slate-700">
+                  <Users size={16} className="mr-2 text-blue-600 shrink-0" />
+                  <span><strong>Responsables:</strong> Estudiante, EduLAB, Sistema Académico.</span>
                 </div>
-            );
-        };
+              </div>
 
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<App />);
-    </script>
-</body>
-</html>
+              <div className="flex flex-col items-center py-10 px-4 w-full border-b border-slate-200 bg-slate-50">
+                <VDecisionInteractive 
+                  title="¿Aprueba todas las asignaturas del minor?" 
+                  noLabel="No se certifica el minor" 
+                  noNote="Se reconocen únicamente los créditos aprobados en el historial del estudiante." 
+                />
+                <VArrow label="Sí" />
+                <VNode title="Obtiene certificado académico complementario" icon={FileText} />
+                <VArrow />
+                <VNode title="Se otorga insignia digital" icon={Award} />
+                <VArrow />
+                <VNode title="Fin" type="end" />
+              </div>
+
+              {/* Casos especiales interactivos */}
+              <div className="p-6 md:p-8 bg-white">
+                <h3 className="text-lg font-bold text-slate-800 mb-6 flex items-center">
+                  <AlertTriangle className="mr-2 text-amber-500" size={20} /> Consideraciones y casos especiales
+                </h3>
+                
+                <div className="max-w-2xl mx-auto">
+                  <AccordionItem title="1. Estudiantes egresados">
+                    Si el estudiante no termina el minor antes de graduarse, puede finalizarlo hasta por <strong>2 años después</strong> de su graduación matriculándose como estudiante transitorio. El certificado se emitirá una vez apruebe todas las asignaturas requeridas.
+                  </AccordionItem>
+                  
+                  <AccordionItem title="2. Reprobación de asignaturas">
+                    <ul className="list-disc pl-5 space-y-1">
+                      <li><strong>Si se matriculó como optativa/electiva:</strong> Puede repetirse la asignatura, o bien, renunciar al minor y elegir otra materia de la oferta institucional.</li>
+                      <li><strong>Si se matriculó como crédito adicional:</strong> La asignatura deberá repetirse obligatoriamente hasta ser aprobada.</li>
+                    </ul>
+                  </AccordionItem>
+
+                  <AccordionItem title="3. Asociación con otro minor">
+                    Si un minor comparte asignaturas con otro, las asignaturas que el estudiante ya haya aprobado se consideran cursadas para el nuevo minor. Solo deberá matricular y cursar las asignaturas adicionales faltantes.
+                  </AccordionItem>
+
+                  <AccordionItem title="4. Estudiantes con segundo programa">
+                    Si el minor no aplica para alguno de sus programas, no está habilitado para cursarlo. Sin embargo, si primero cursó el minor y luego inicia un segundo programa en el que sí aplica, puede homologar las asignaturas que ya tiene cursadas y aprobadas.
+                  </AccordionItem>
+
+                  <AccordionItem title="5. Cruce con asignaturas obligatorias">
+                    Si <strong>más de una asignatura</strong> del minor ya es de carácter obligatorio en el plan de estudios habitual del programa del estudiante, no podrá obtener el reconocimiento de dicho minor.
+                  </AccordionItem>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* MODAL DETALLES */}
+      {modalData && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setModalData(null)}>
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
+            <div className="bg-blue-600 p-4 text-white flex justify-between items-center">
+              <h3 className="font-bold flex items-center text-sm"><CheckCircle size={18} className="mr-2" /> {modalData.title}</h3>
+            </div>
+            <div className="p-6">
+              <ul className="space-y-3">
+                {modalData.items.map((item, idx) => (
+                  <li key={idx} className="flex items-start text-sm text-slate-700">
+                    <CheckCircle size={16} className="text-emerald-500 mr-3 mt-0.5 shrink-0" />
+                    <span className="leading-tight">{item}</span>
+                  </li>
+                ))}
+              </ul>
+              <button 
+                className="w-full mt-6 bg-slate-100 hover:bg-slate-200 text-slate-800 py-2.5 rounded-lg text-sm font-semibold transition-colors"
+                onClick={() => setModalData(null)}
+              >
+                Entendido
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+    </div>
+  );
+}
